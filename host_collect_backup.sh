@@ -3,6 +3,7 @@ set -eu
 
 MONITOR_STATUS_DIR=${MONITOR_STATUS_DIR:-./data/monitor-status}
 HOST_BACKUP_TARGETS=${HOST_BACKUP_TARGETS:-"/tmp|24|1"}
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$MONITOR_STATUS_DIR"
 out="$MONITOR_STATUS_DIR/backup_status.json"
 
@@ -44,27 +45,6 @@ for item in $HOST_BACKUP_TARGETS; do
   printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$status" "$exists" "$age_hours" "$size" >> "$tmp"
 done
 
-python3 - "$tmp" "$out" "$now_h" "$ok" "$summary" <<'PY'
-import json, sys
-src, out, now_h, ok_str, summary = sys.argv[1:6]
-ok = ok_str.lower() == 'true'
-items = []
-with open(src, 'r', encoding='utf-8') as f:
-    for line in f:
-        line = line.rstrip('\n')
-        if not line:
-            continue
-        path, status, exists, age_hours, size = line.split('\t')
-        items.append({
-            "path": path,
-            "status": status,
-            "exists": exists.lower() == 'true',
-            "age_hours": int(age_hours),
-            "size": int(size),
-        })
-obj = {"kind": "backup", "ok": ok, "time": now_h, "summary": summary, "items": items}
-with open(out, 'w', encoding='utf-8') as f:
-    json.dump(obj, f, ensure_ascii=False)
-PY
+python3 "$SCRIPT_DIR/host_write_status.py" backup "$tmp" "$out" "$now_h" "$ok" "$summary"
 rm -f "$tmp"
 echo "wrote $out"
