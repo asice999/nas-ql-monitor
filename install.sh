@@ -38,5 +38,8 @@ add_or_update '20 3 * * *' "task $QL_REPO_DIR/ql_check_backup.js" 'NAS 备份结
 add_or_update '0 9 * * *' "task $QL_REPO_DIR/ql_daily_report.js" 'NAS 每日报告'
 add_or_update '*/30 * * * *' "task $QL_REPO_DIR/ql_check_ddns_ip.js" 'NAS DDNS / IP 监控'
 add_or_update '*/15 * * * *' "task $QL_REPO_DIR/ql_check_api_health.js" 'NAS API 健康检查'
+add_or_update '*/10 * * * *' "task $QL_REPO_DIR/ql_read_host_docker.js" '宿主机 Docker 状态读取'
+add_or_update '0 */6 * * *' "task $QL_REPO_DIR/ql_read_host_disk.js" '宿主机磁盘状态读取'
+add_or_update '20 3 * * *' "task $QL_REPO_DIR/ql_read_host_backup.js" '宿主机备份状态读取'
 
 echo '安装完成。已创建/重建全部 NAS 监控任务。'

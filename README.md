@@ -2,157 +2,97 @@
 
 适合 NAS / Docker / 青龙(QingLong) 用户的通知监控脚本集合。
 
-## 当前包含
-- `check_services.sh`：服务在线监控
-- `check_docker.sh`：Docker 容器状态监控
-- `check_disk.sh`：磁盘空间监控
-- `check_cert.sh`：HTTPS 证书到期监控
-- `check_backup.sh`：备份结果监控
-- `daily_report.sh`：NAS 每日报告
-- `check_ddns_ip.sh`：DDNS / 公网 IP 监控
-- `check_api_health.sh`：API 健康检查
-- `notify.sh`：通用通知模块（优先青龙自带通知）
+## 两种模式
+### 1. 青龙容器内直接监控
+适合：服务在线、API、DDNS、证书、日报。
+
+### 2. 宿主机采集 + 青龙读取通知（更安全、更稳定）
+适合：Docker 容器状态、宿主机磁盘、备份文件。
+
+宿主机负责生成 JSON 状态文件，青龙只读取这些文件并通知。
 
 ## 拉库到青龙
-推荐用这个命令，确保 `.js` 与 `.sh` 都能拉到：
-
 ```bash
 ql repo https://github.com/asice999/nas-ql-monitor.git "" "" "" main "js sh"
 ```
 
-## 自动创建任务
-本仓库现在已为主要监控脚本都增加了青龙自动识别入口：
-- `ql_check_services.js`
-- `ql_check_docker.js`
-- `ql_check_disk.js`
-- `ql_check_cert.js`
-- `ql_check_backup.js`
-- `ql_daily_report.js`
-- `ql_check_ddns_ip.js`
-- `ql_check_api_health.js`
+## 宿主机采集脚本
+- `host_collect_docker.sh`
+- `host_collect_disk.sh`
+- `host_collect_backup.sh`
 
-如果你的青龙开启了 `AutoAddCron=true`，并且使用上面的 `js sh` 拉库命令，拉库后会像普通青龙脚本一样**直接创建任务**。
+默认输出目录：
+```text
+./data/monitor-status
+```
+建议宿主机改成固定目录，例如：
+```text
+/volume1/docker/qinglong/data/monitor-status
+```
+或任何你映射进青龙 `/ql/data/monitor-status` 的目录。
 
-也可以手动执行一键安装脚本：
+### 宿主机示例
 ```bash
-cd /ql/data/repo/asice999_nas-ql-monitor && sh install.sh
+MONITOR_STATUS_DIR=/volume1/docker/qinglong/data/monitor-status \
+HOST_CONTAINERS="qinglong postgres-main sub2api moviepilot-v2 jellyfin emby qbittorrent navidrome" \
+sh host_collect_docker.sh
 ```
 
-该安装脚本会使用 `ql` 命令自动创建/重建全部任务。
-
-## 自动创建的任务列表
-- `NAS 服务在线监控`
-- `NAS 容器状态监控`
-- `NAS 磁盘空间监控`
-- `NAS 证书到期监控`
-- `NAS 备份结果监控`
-- `NAS 每日报告`
-- `NAS DDNS / IP 监控`
-- `NAS API 健康检查`
-
-## 推荐目录
-青龙通常会把仓库拉到类似目录：
 ```bash
-/ql/data/repo/asice999_nas-ql-monitor/
+MONITOR_STATUS_DIR=/volume1/docker/qinglong/data/monitor-status \
+HOST_TARGETS="/ /volume1" \
+HOST_THRESHOLD=85 \
+sh host_collect_disk.sh
 ```
+
+```bash
+MONITOR_STATUS_DIR=/volume1/docker/qinglong/data/monitor-status \
+HOST_BACKUP_TARGETS="/volume1/backup/db.sql.gz|30|1024 /volume1/backup/config.tar.gz|30|1024" \
+sh host_collect_backup.sh
+```
+
+## 青龙读取任务
+- `ql_read_host_docker.js`
+- `ql_read_host_disk.js`
+- `ql_read_host_backup.js`
+
+对应 shell：
+- `read_host_docker.sh`
+- `read_host_disk.sh`
+- `read_host_backup.sh`
+
+默认读取目录：
+```text
+/ql/data/monitor-status
+```
+
+环境变量：
+- `HOST_STATUS_DIR`
+- `STATUS_FILE`
+
+### 自动创建任务
+执行：
+```bash
+cd /ql/data/repo/asice999_nas-ql-monitor_main && sh install.sh
+```
+
+将自动创建：
+- `宿主机 Docker 状态读取`
+- `宿主机磁盘状态读取`
+- `宿主机备份状态读取`
+以及原有 NAS 监控任务。
 
 ## 通知方式
-现在默认**优先复用青龙自带通知**，效果和很多电信/签到脚本一致。
+默认优先复用青龙自带通知。
 
-优先级如下：
-1. 青龙 `sendNotify.js`
-2. 青龙常见通知环境变量
-3. 输出到任务日志
-
-### 状态变化通知
-主要告警脚本已加入**状态记忆**：
+## 状态变化通知
+主要告警脚本已加入状态记忆：
 - 首次异常时通知
 - 持续异常不重复刷屏
 - 恢复正常时再发一条恢复通知
 
-状态文件默认保存在仓库目录下的 `.state/`。
+状态文件默认保存在 `.state/`。
 
-### 推荐：直接使用青龙现有通知配置
-如果你的青龙已经能给其他脚本发通知，这个仓库通常**无需额外配置**。
-
-### 兼容的常见青龙通知变量
-- `BARK_PUSH` / `BARK_URL`
-- `TG_BOT_TOKEN`
-- `TG_USER_ID`（也兼容 `TG_CHAT_ID`）
-- `PUSH_PLUS_TOKEN`
-- `QYWX_KEY`
-- `DD_BOT_TOKEN`
-
-## 任务入口与默认 cron
-- `ql_check_services.js` → `*/10 * * * *`
-- `ql_check_docker.js` → `*/10 * * * *`
-- `ql_check_disk.js` → `0 */6 * * *`
-- `ql_check_cert.js` → `30 8 * * *`
-- `ql_check_backup.js` → `20 3 * * *`
-- `ql_daily_report.js` → `0 9 * * *`
-- `ql_check_ddns_ip.js` → `*/30 * * * *`
-- `ql_check_api_health.js` → `*/15 * * * *`
-
-### 日报异常摘要
-`daily_report.sh` 现在会读取 `.state/alert_events.log`，附带最近的异常/恢复摘要。
-可通过环境变量控制显示条数：
+## 日报异常摘要
+`daily_report.sh` 会读取 `.state/alert_events.log`，附带最近异常/恢复摘要。
 - `REPORT_EVENT_LINES`：默认 `10`
-
-## 业务环境变量
-- `SERVICES`
-- `CONTAINERS`
-- `TARGETS`
-- `THRESHOLD`
-- `TIMEOUT`
-- `CERT_HOSTS`
-- `CERT_WARN_DAYS`
-- `BACKUP_TARGETS`
-- `REPORT_SERVICES`
-- `REPORT_CONTAINERS`
-- `REPORT_TARGETS`
-- `REPORT_CERT_HOSTS`
-- `REPORT_BACKUP_TARGETS`
-- `IP_API_URL`
-- `DDNS_DOMAINS`
-- `STATE_DIR`
-- `IP_FAMILY`
-- `API_TARGETS`
-
-## 通知变量（优先复用青龙）
-- `BARK_PUSH`
-- `BARK_URL`
-- `TG_BOT_TOKEN`
-- `TG_USER_ID`
-- `TG_CHAT_ID`
-- `PUSH_PLUS_TOKEN`
-- `QYWX_KEY`
-- `DD_BOT_TOKEN`
-
-## API_TARGETS 格式
-多个目标用 `;;` 分隔，每项格式：
-```text
-URL|名称|期望状态码|关键字
-```
-关键字可留空。
-
-示例：
-```bash
-API_TARGETS="https://api.example.com/health|主接口|200|ok;;https://example.com|主页|200|Example Domain"
-```
-
-## 返回码约定
-- 监控脚本：正常返回 `0`，发现异常返回 `1`
-- `daily_report.sh`：始终返回 `0`，避免青龙将日报误判为失败
-
-## 常见问题
-### 1. 为什么还是没有自动生成任务？
-请同时检查：
-- 青龙 `AutoAddCron=true`
-- 拉库命令使用了 `main "js sh"`
-- 拉库成功，没有网络/TLS 错误
-
-### 2. 为什么我没有额外配置通知也能收到消息？
-因为仓库会优先尝试调用青龙现有的 `sendNotify.js` 或青龙通知变量。
-
-### 3. DDNS 监控为什么误报？
-如果你的域名解析到 CDN / 反代而不是直连家宽公网 IP，就不适合直接做“解析 IP == 当前公网 IP”的校验。
