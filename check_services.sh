@@ -14,10 +14,10 @@ for item in $SERVICES; do
   name=${item#*|}
   code=$(curl -k -sS -m "$TIMEOUT" -o /dev/null -w '%{http_code}' "$url" || true)
   if [ "$code" = "200" ]; then
-    MSG="$MSG✅ $name OK ($code)\n"
+    MSG="$MSG✅ $name：正常\n"
   else
     FAIL=1
-    MSG="$MSG❌ $name FAIL ($code)\n"
+    MSG="$MSG❌ $name：异常($code) ⚠️\n"
   fi
 done
 

@@ -61,10 +61,11 @@ warn = int(sys.argv[2])
 d = json.load(open(p, encoding="utf-8"))
 for item in d.get("items", []):
     mount = item.get("mount")
-    used = item.get("used", 0)
-    free = item.get("free")
-    mark = " ⚠️" if int(used) >= warn else ""
-    print("- {}：已用 {}%，剩余 {}{}".format(mount, used, free, mark))
+    used = int(item.get("used", 0))
+    free_kb = int(item.get("free", 0))
+    free_gb = free_kb / 1024 / 1024
+    mark = " ⚠️" if used >= warn else ""
+    print("- {}：已用 {}%，剩余 {:.1f} GB{}".format(mount, used, free_gb, mark))
 ' "$HOST_STATUS_DIR/disk_status.json" "$REPORT_DISK_WARN" > "$DIR/.state/.host_disk_daily.tmp"
   MSG="$MSG$(cat "$DIR/.state/.host_disk_daily.tmp")\n"
   rm -f "$DIR/.state/.host_disk_daily.tmp"
@@ -81,7 +82,7 @@ for item in d.get("items", []):
     status = item.get("status")
     restart = item.get("restart", 0)
     mark = " ⚠️" if status != "running" else ""
-    cn = "运行中" if status == "running" else str(status)
+    cn = "运行中" if status == "running" else ("未找到" if status == "missing" else str(status))
     print("- {}：{}，重启 {} 次{}".format(name, cn, restart, mark))
 ' "$HOST_STATUS_DIR/docker_status.json" > "$DIR/.state/.host_docker_daily.tmp"
   MSG="$MSG$(cat "$DIR/.state/.host_docker_daily.tmp")\n"
