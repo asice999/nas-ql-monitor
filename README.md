@@ -11,7 +11,7 @@
 - `daily_report.sh`：NAS 每日报告
 - `check_ddns_ip.sh`：DDNS / 公网 IP 监控
 - `check_api_health.sh`：API 健康检查
-- `notify.sh`：通用通知模块（Bark / Telegram / stdout）
+- `notify.sh`：通用通知模块（优先青龙自带通知）
 
 ## 拉库到青龙
 ```bash
@@ -40,19 +40,24 @@ cd /ql/data/repo/asice999_nas-ql-monitor && sh install.sh
 /ql/data/repo/asice999_nas-ql-monitor/
 ```
 
-## 通知环境变量
-支持两种推送方式，任选其一：
+## 通知方式
+现在默认**优先复用青龙自带通知**，效果和很多电信/签到脚本一致。
 
-### Bark
-```bash
-BARK_URL=https://api.day.app/你的key
-```
+优先级如下：
+1. 青龙 `sendNotify.js`
+2. 青龙常见通知环境变量
+3. 输出到任务日志
 
-### Telegram
-```bash
-TG_BOT_TOKEN=你的bot_token
-TG_CHAT_ID=你的chat_id
-```
+### 推荐：直接使用青龙现有通知配置
+如果你的青龙已经能给其他脚本发通知，这个仓库通常**无需额外配置**。
+
+### 兼容的常见青龙通知变量
+- `BARK_PUSH` / `BARK_URL`
+- `TG_BOT_TOKEN`
+- `TG_USER_ID`（也兼容 `TG_CHAT_ID`）
+- `PUSH_PLUS_TOKEN`
+- `QYWX_KEY`
+- `DD_BOT_TOKEN`
 
 ## 新增任务说明
 
@@ -87,9 +92,7 @@ cron：
 - 适合接口、登录页、状态页
 
 ## 环境变量总览
-- `BARK_URL`
-- `TG_BOT_TOKEN`
-- `TG_CHAT_ID`
+### 业务监控变量
 - `SERVICES`
 - `CONTAINERS`
 - `TARGETS`
@@ -109,6 +112,16 @@ cron：
 - `IP_FAMILY`
 - `API_TARGETS`
 
+### 通知变量（优先复用青龙）
+- `BARK_PUSH`
+- `BARK_URL`
+- `TG_BOT_TOKEN`
+- `TG_USER_ID`
+- `TG_CHAT_ID`
+- `PUSH_PLUS_TOKEN`
+- `QYWX_KEY`
+- `DD_BOT_TOKEN`
+
 ## 返回码约定
 - 监控脚本：正常返回 `0`，发现异常返回 `1`
 - `daily_report.sh`：始终返回 `0`，避免青龙将日报误判为失败
@@ -120,10 +133,13 @@ cron：
 cd /ql/data/repo/asice999_nas-ql-monitor && sh install.sh
 ```
 
-### 2. DDNS 监控为什么误报？
+### 2. 为什么我没有额外配置通知也能收到消息？
+因为仓库会优先尝试调用青龙现有的 `sendNotify.js` 或青龙通知变量。
+
+### 3. DDNS 监控为什么误报？
 如果你的域名解析到 CDN / 反代而不是直连家宽公网 IP，就不适合直接做“解析 IP == 当前公网 IP”的校验。
 
-### 3. API 健康检查如何写多个目标？
+### 4. API 健康检查如何写多个目标？
 用 `;;` 分隔多个项，每项格式固定为：
 ```text
 URL|名称|期望状态码|关键字
