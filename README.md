@@ -93,6 +93,11 @@ cd /ql/data/repo/asice999_nas-ql-monitor && sh install.sh
 - `ql_check_ddns_ip.js` → `*/30 * * * *`
 - `ql_check_api_health.js` → `*/15 * * * *`
 
+### 日报异常摘要
+`daily_report.sh` 现在会读取 `.state/alert_events.log`，附带最近的异常/恢复摘要。
+可通过环境变量控制显示条数：
+- `REPORT_EVENT_LINES`：默认 `10`
+
 ## 业务环境变量
 - `SERVICES`
 - `CONTAINERS`

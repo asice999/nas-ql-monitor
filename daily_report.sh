@@ -2,12 +2,14 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
 REPORT_SERVICES=${REPORT_SERVICES:-""}
 REPORT_CONTAINERS=${REPORT_CONTAINERS:-""}
 REPORT_TARGETS=${REPORT_TARGETS:-"/"}
 REPORT_CERT_HOSTS=${REPORT_CERT_HOSTS:-""}
 REPORT_BACKUP_TARGETS=${REPORT_BACKUP_TARGETS:-""}
+REPORT_EVENT_LINES=${REPORT_EVENT_LINES:-10}
 TIMEOUT=${TIMEOUT:-8}
 CERT_WARN_DAYS=${CERT_WARN_DAYS:-30}
 NOW=$(date +%s)
@@ -79,6 +81,21 @@ if [ -n "$REPORT_BACKUP_TARGETS" ]; then
     [ "$age_hours" -gt "$max_hours" ] && MSG="$MSG ⚠️"
     MSG="$MSG\n"
   done
+fi
+
+if [ -f "$EVENT_LOG" ]; then
+  MSG="$MSG\n[最近异常摘要]\n"
+  tail -n "$REPORT_EVENT_LINES" "$EVENT_LOG" | while IFS= read -r line; do
+    printf '%s\n' "- $line"
+  done > "$DIR/.state/.daily_event_snip.tmp"
+  if [ -s "$DIR/.state/.daily_event_snip.tmp" ]; then
+    MSG="$MSG$(cat "$DIR/.state/.daily_event_snip.tmp")\n"
+  else
+    MSG="$MSG- 无\n"
+  fi
+  rm -f "$DIR/.state/.daily_event_snip.tmp"
+else
+  MSG="$MSG\n[最近异常摘要]\n- 暂无记录\n"
 fi
 
 notify "NAS 每日报告" "$(printf '%b' "$MSG")"
