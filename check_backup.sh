@@ -2,6 +2,7 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
 BACKUP_TARGETS=${BACKUP_TARGETS:-"/tmp|24|1"}
 NOW=$(date +%s)
@@ -39,6 +40,8 @@ for item in $BACKUP_TARGETS; do
   fi
 done
 
-[ "$FAIL" -eq 0 ] && exit 0
-notify "NAS 备份结果告警" "$(printf '%b' "$MSG")"
-exit 1
+if [ "$FAIL" -eq 0 ]; then
+  notify_on_change backup ok "NAS 备份结果告警" "$(printf '%b' "$MSG")" "NAS 备份恢复正常" "$(printf '%b' "$MSG")"
+  exit 0
+fi
+notify_on_change backup alert "NAS 备份结果告警" "$(printf '%b' "$MSG")" "NAS 备份恢复正常" "$(printf '%b' "$MSG")" || exit 1

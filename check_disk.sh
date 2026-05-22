@@ -2,6 +2,7 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
 THRESHOLD=${THRESHOLD:-85}
 TARGETS=${TARGETS:-"/ /volume1 /var/lib/docker"}
@@ -23,6 +24,8 @@ for p in $TARGETS; do
   fi
 done
 
-[ "$FAIL" -eq 0 ] && exit 0
-notify "NAS 磁盘空间告警" "$(printf '%b' "$MSG")"
-exit 1
+if [ "$FAIL" -eq 0 ]; then
+  notify_on_change disk ok "NAS 磁盘空间告警" "$(printf '%b' "$MSG")" "NAS 磁盘空间恢复" "$(printf '%b' "$MSG")"
+  exit 0
+fi
+notify_on_change disk alert "NAS 磁盘空间告警" "$(printf '%b' "$MSG")" "NAS 磁盘空间恢复" "$(printf '%b' "$MSG")" || exit 1

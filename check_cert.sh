@@ -2,6 +2,7 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
 CERT_HOSTS=${CERT_HOSTS:-"example.com"}
 CERT_WARN_DAYS=${CERT_WARN_DAYS:-30}
@@ -32,6 +33,8 @@ for host in $CERT_HOSTS; do
   fi
 done
 
-[ "$FAIL" -eq 0 ] && exit 0
-notify "NAS 证书到期告警" "$(printf '%b' "$MSG")"
-exit 1
+if [ "$FAIL" -eq 0 ]; then
+  notify_on_change cert ok "NAS 证书到期告警" "$(printf '%b' "$MSG")" "NAS 证书恢复正常" "$(printf '%b' "$MSG")"
+  exit 0
+fi
+notify_on_change cert alert "NAS 证书到期告警" "$(printf '%b' "$MSG")" "NAS 证书恢复正常" "$(printf '%b' "$MSG")" || exit 1

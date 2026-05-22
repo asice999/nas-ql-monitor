@@ -2,6 +2,7 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
 API_TARGETS=${API_TARGETS:-"https://example.com/health|示例接口|200|ok"}
 TIMEOUT=${TIMEOUT:-10}
@@ -38,6 +39,8 @@ while IFS= read -r item; do
 done < "$TMP_ITEMS"
 rm -f "$TMP_ITEMS"
 
-[ "$FAIL" -eq 0 ] && exit 0
-notify "NAS API 健康检查异常" "$(printf '%b' "$MSG")"
-exit 1
+if [ "$FAIL" -eq 0 ]; then
+  notify_on_change api_health ok "NAS API 健康检查异常" "$(printf '%b' "$MSG")" "NAS API 健康检查恢复" "$(printf '%b' "$MSG")"
+  exit 0
+fi
+notify_on_change api_health alert "NAS API 健康检查异常" "$(printf '%b' "$MSG")" "NAS API 健康检查恢复" "$(printf '%b' "$MSG")" || exit 1

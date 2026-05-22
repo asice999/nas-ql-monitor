@@ -2,6 +2,7 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
 STATE_DIR=${STATE_DIR:-"$DIR/.state"}
 IP_API_URL=${IP_API_URL:-"https://api.ipify.org"}
@@ -12,7 +13,7 @@ state_file="$STATE_DIR/public_ip_${IP_FAMILY}.txt"
 
 current_ip=$(curl -fsS --max-time 10 "$IP_API_URL" 2>/dev/null | tr -d '\r\n ' || true)
 if [ -z "$current_ip" ]; then
-  notify "NAS 公网 IP 监控异常" "无法从 $IP_API_URL 获取当前公网 IP"
+  notify_on_change ddns_ip alert "NAS 公网 IP 监控异常" "无法从 $IP_API_URL 获取当前公网 IP" "NAS 公网 IP 监控恢复" "已恢复获取公网 IP"
   exit 1
 fi
 
@@ -43,6 +44,8 @@ for domain in $DDNS_DOMAINS; do
   fi
 done
 
-[ "$FAIL" -eq 0 ] && exit 0
-notify "NAS DDNS / IP 告警" "$(printf '%b' "$MSG")"
-exit 1
+if [ "$FAIL" -eq 0 ]; then
+  notify_on_change ddns_ip ok "NAS DDNS / IP 告警" "$(printf '%b' "$MSG")" "NAS DDNS / IP 恢复" "$(printf '%b' "$MSG")"
+  exit 0
+fi
+notify_on_change ddns_ip alert "NAS DDNS / IP 告警" "$(printf '%b' "$MSG")" "NAS DDNS / IP 恢复" "$(printf '%b' "$MSG")" || exit 1

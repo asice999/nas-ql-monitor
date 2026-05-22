@@ -2,8 +2,8 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/notify.sh"
+. "$DIR/state.sh"
 
-# 用法：SERVICES="https://a.com|站点A https://b.com|站点B" ./check_services.sh
 SERVICES=${SERVICES:-"https://127.0.0.1:5700|青龙 https://127.0.0.1:8096|Jellyfin"}
 TIMEOUT=${TIMEOUT:-8}
 FAIL=0
@@ -21,6 +21,8 @@ for item in $SERVICES; do
   fi
 done
 
-[ "$FAIL" -eq 0 ] && exit 0
-notify "NAS 服务异常" "$(printf '%b' "$MSG")"
-exit 1
+if [ "$FAIL" -eq 0 ]; then
+  notify_on_change services ok "NAS 服务异常" "$(printf '%b' "$MSG")" "NAS 服务恢复" "$(printf '%b' "$MSG")"
+  exit 0
+fi
+notify_on_change services alert "NAS 服务异常" "$(printf '%b' "$MSG")" "NAS 服务恢复" "$(printf '%b' "$MSG")" || exit 1
