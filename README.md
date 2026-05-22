@@ -100,3 +100,12 @@ cd /ql/data/repo/asice999_nas-ql-monitor_main && sh install.sh
 - `REPORT_HOST_DOCKER`：默认 `true`，日报正文显示宿主机 Docker 当前状态
 - `REPORT_HOST_DISK`：默认 `true`，日报正文显示宿主机磁盘当前状态
 - 容量显示规则：≥ 1TB 显示为 `xx.xx TB`，≥ 1GB 显示为 `xx.xx GB`，否则显示为 `xx.xx MB`
+
+## 公网 IP 接口容灾
+- `IP_API_URL`：主接口，默认 `https://icanhazip.com`
+- `IP_API_URLS`：备用接口列表，空格分隔，默认：
+  - `https://icanhazip.com`
+  - `https://ifconfig.me/ip`
+  - `https://ip.sb`
+  - `https://api.ipify.org`
+脚本会按顺序自动轮询，直到成功拿到公网 IP。
