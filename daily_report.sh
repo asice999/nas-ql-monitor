@@ -7,6 +7,7 @@ DIR=$(cd "$(dirname "$0")" && pwd)
 REPORT_SERVICES=${REPORT_SERVICES:-""}
 REPORT_CONTAINERS=${REPORT_CONTAINERS:-""}
 REPORT_TARGETS=${REPORT_TARGETS:-"/"}
+REPORT_DISK_WARN=${REPORT_DISK_WARN:-85}
 REPORT_CERT_HOSTS=${REPORT_CERT_HOSTS:-""}
 REPORT_BACKUP_TARGETS=${REPORT_BACKUP_TARGETS:-""}
 REPORT_EVENT_LINES=${REPORT_EVENT_LINES:-10}
@@ -39,9 +40,12 @@ if [ -n "$REPORT_TARGETS" ]; then
     line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$6}') || true
     [ -n "$line" ] || continue
     used=$(printf '%s' "$line" | awk '{print $1}')
+    used_num=$(printf '%s' "$used" | tr -d '%')
     avail=$(printf '%s' "$line" | awk '{print $2}')
     mount=$(printf '%s' "$line" | awk '{print $3}')
-    MSG="$MSG- $mount: used $used, free $avail\n"
+    MSG="$MSG- $mount: used $used, free $avail"
+    [ "$used_num" -ge "$REPORT_DISK_WARN" ] && MSG="$MSG ⚠️"
+    MSG="$MSG\n"
   done
 fi
 

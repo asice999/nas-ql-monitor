@@ -96,3 +96,4 @@ cd /ql/data/repo/asice999_nas-ql-monitor_main && sh install.sh
 ## 日报异常摘要
 `daily_report.sh` 会读取 `.state/alert_events.log`，附带最近异常/恢复摘要。
 - `REPORT_EVENT_LINES`：默认 `10`
+- `REPORT_DISK_WARN`：默认 `85`，仅用于日报中给高使用率磁盘加 `⚠️` 标记，不影响日报每天推送
