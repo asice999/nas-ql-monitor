@@ -95,10 +95,11 @@ cd /ql/data/repo/asice999_nas-ql-monitor_main && sh install.sh
 
 ## 日报异常摘要
 `daily_report.sh` 会读取 `.state/alert_events.log`，附带最近异常/恢复摘要。
-- `REPORT_EVENT_LINES`：默认 `10`
+- `REPORT_EVENT_LINES`：默认 `3`
 - `REPORT_DISK_WARN`：默认 `85`，仅用于日报中给高使用率磁盘加 `⚠️` 标记，不影响日报每天推送
 - `REPORT_HOST_DOCKER`：默认 `true`，日报正文显示宿主机 Docker 当前状态
 - `REPORT_HOST_DISK`：默认 `true`，日报正文显示宿主机磁盘当前状态
+- `REPORT_FULL_DOCKER`：默认 `false`，日报只显示异常宿主机容器；改成 `true` 才显示全部容器
 - 容量显示规则：≥ 1TB 显示为 `xx.xx TB`，≥ 1GB 显示为 `xx.xx GB`，否则显示为 `xx.xx MB`
 
 ## 公网 IP 接口容灾

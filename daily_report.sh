@@ -10,86 +10,53 @@ REPORT_TARGETS=${REPORT_TARGETS:-"/"}
 REPORT_DISK_WARN=${REPORT_DISK_WARN:-85}
 REPORT_CERT_HOSTS=${REPORT_CERT_HOSTS:-""}
 REPORT_BACKUP_TARGETS=${REPORT_BACKUP_TARGETS:-""}
-REPORT_EVENT_LINES=${REPORT_EVENT_LINES:-10}
+REPORT_EVENT_LINES=${REPORT_EVENT_LINES:-3}
 HOST_STATUS_DIR=${HOST_STATUS_DIR:-/ql/data/monitor-status}
 REPORT_HOST_DOCKER=${REPORT_HOST_DOCKER:-true}
 REPORT_HOST_DISK=${REPORT_HOST_DISK:-true}
+REPORT_FULL_DOCKER=${REPORT_FULL_DOCKER:-false}
 TIMEOUT=${TIMEOUT:-8}
 CERT_WARN_DAYS=${CERT_WARN_DAYS:-30}
 NOW=$(date +%s)
 MSG="【NAS 每日报告】\n"
+HAS_WARN=0
+
+human_kb() {
+  python3 -c '
+import sys
+v = float(sys.argv[1])
+if v >= 1024*1024*1024:
+    print(f"{v/1024/1024/1024:.2f} T")
+elif v >= 1024*1024:
+    print(f"{v/1024/1024:.2f} G")
+elif v >= 1024:
+    print(f"{v/1024:.2f} M")
+else:
+    print(f"{v:.2f} K")
+' "$1"
+}
 
 if [ -n "$REPORT_SERVICES" ]; then
-  MSG="$MSG\n[服务在线]\n"
+  block=""
   for item in $REPORT_SERVICES; do
     url=${item%%|*}
     name=${item#*|}
     code=$(curl -k -sS -m "$TIMEOUT" -o /dev/null -w '%{http_code}' "$url" || true)
     if [ "$code" = "200" ]; then
-      MSG="$MSG- $name：正常\n"
+      :
     elif [ "$code" = "301" ] || [ "$code" = "302" ]; then
-      MSG="$MSG- $name：跳转($code) ⚠️\n"
+      block="$block- $name：跳转($code) ⚠️\n"
+      HAS_WARN=1
     else
-      MSG="$MSG- $name：异常($code) ⚠️\n"
+      block="$block- $name：异常($code) ⚠️\n"
+      HAS_WARN=1
     fi
   done
-fi
-
-if [ -n "$REPORT_CONTAINERS" ]; then
-  MSG="$MSG\n[容器状态]\n"
-  for c in $REPORT_CONTAINERS; do
-    status=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)
-    MSG="$MSG- $c: $status\n"
-  done
-fi
-
-if [ -n "$REPORT_TARGETS" ]; then
-  container_disk_tmp="$DIR/.state/.container_disk_daily.tmp"
-  : > "$container_disk_tmp"
-  for p in $REPORT_TARGETS; do
-    line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$2" "$6}') || true
-    [ -n "$line" ] || continue
-    used=$(printf '%s' "$line" | awk '{print $1}')
-    used_num=$(printf '%s' "$used" | tr -d '%')
-    avail=$(printf '%s' "$line" | awk '{print $2}')
-    total=$(printf '%s' "$line" | awk '{print $3}')
-    mount=$(printf '%s' "$line" | awk '{print $4}')
-    human=$(python3 -c '
-import sys
-v = float(sys.argv[1])
-if v >= 1024*1024*1024:
-    print(f"{v/1024/1024/1024:.2f} T")
-elif v >= 1024*1024:
-    print(f"{v/1024/1024:.2f} G")
-elif v >= 1024:
-    print(f"{v/1024:.2f} M")
-else:
-    print(f"{v:.2f} K")
-' "$avail")
-    human_total=$(python3 -c '
-import sys
-v = float(sys.argv[1])
-if v >= 1024*1024*1024:
-    print(f"{v/1024/1024/1024:.2f} T")
-elif v >= 1024*1024:
-    print(f"{v/1024/1024:.2f} G")
-elif v >= 1024:
-    print(f"{v/1024:.2f} M")
-else:
-    print(f"{v:.2f} K")
-' "$total")
-    line_text="- $mount：已用 $used，剩余 $human，总容量 $human_total"
-    [ "$used_num" -ge "$REPORT_DISK_WARN" ] && line_text="$line_text ⚠️"
-    printf '%s\n' "$line_text" >> "$container_disk_tmp"
-  done
-  if [ -s "$container_disk_tmp" ]; then
-    MSG="$MSG\n[容器内磁盘空间]\n$(cat "$container_disk_tmp")\n"
-  fi
-  rm -f "$container_disk_tmp"
+  [ -n "$block" ] && MSG="$MSG\n[服务异常]\n$(printf '%b' "$block")"
 fi
 
 if [ "$REPORT_HOST_DISK" = "true" ] && [ -f "$HOST_STATUS_DIR/disk_status.json" ]; then
-  MSG="$MSG\n[宿主机磁盘状态]\n"
+  MSG="$MSG\n[宿主机磁盘]\n"
   python3 -c '
 import json, sys
 p = sys.argv[1]
@@ -97,6 +64,8 @@ warn = int(sys.argv[2])
 d = json.load(open(p, encoding="utf-8"))
 def human(kb):
     kb = float(kb)
+    if kb >= 1024 * 1024 * 1024:
+        return f"{kb/1024/1024/1024:.2f} TB"
     if kb >= 1024 * 1024 * 1024:
         return f"{kb/1024/1024/1024:.2f} TB"
     if kb >= 1024 * 1024:
@@ -110,82 +79,67 @@ for item in d.get("items", []):
     free_kb = float(item.get("free", 0))
     total_kb = float(item.get("total", 0))
     mark = " ⚠️" if used >= warn else ""
-    print("- {}：已用 {}%，剩余 {}，总容量 {}{}".format(mount, used, human(free_kb), human(total_kb), mark))
+    print("- {}：{} 已用，剩余 {} / 总 {}{}".format(mount, str(used)+"%", human(free_kb), human(total_kb), mark))
 ' "$HOST_STATUS_DIR/disk_status.json" "$REPORT_DISK_WARN" > "$DIR/.state/.host_disk_daily.tmp"
   MSG="$MSG$(cat "$DIR/.state/.host_disk_daily.tmp")\n"
   rm -f "$DIR/.state/.host_disk_daily.tmp"
 fi
 
 if [ "$REPORT_HOST_DOCKER" = "true" ] && [ -f "$HOST_STATUS_DIR/docker_status.json" ]; then
-  MSG="$MSG\n[宿主机 Docker 状态]\n"
   python3 -c '
 import json, sys
 p = sys.argv[1]
+full = sys.argv[2].lower() == "true"
 d = json.load(open(p, encoding="utf-8"))
+lines=[]
 for item in d.get("items", []):
     name = item.get("name")
     status = item.get("status")
     restart = item.get("restart", 0)
-    mark = " ⚠️" if status != "running" else ""
     cn = "运行中" if status == "running" else ("未找到" if status == "missing" else str(status))
-    print("- {}：{}，重启 {} 次{}".format(name, cn, restart, mark))
-' "$HOST_STATUS_DIR/docker_status.json" > "$DIR/.state/.host_docker_daily.tmp"
-  MSG="$MSG$(cat "$DIR/.state/.host_docker_daily.tmp")\n"
+    mark = " ⚠️" if status != "running" else ""
+    line = "- {}：{}，重启 {} 次{}".format(name, cn, restart, mark)
+    if full or status != "running":
+        lines.append(line)
+print("\n".join(lines))
+' "$HOST_STATUS_DIR/docker_status.json" "$REPORT_FULL_DOCKER" > "$DIR/.state/.host_docker_daily.tmp"
+  if [ -s "$DIR/.state/.host_docker_daily.tmp" ]; then
+    MSG="$MSG\n[宿主机 Docker]\n$(cat "$DIR/.state/.host_docker_daily.tmp")\n"
+  fi
   rm -f "$DIR/.state/.host_docker_daily.tmp"
 fi
 
 if [ -n "$REPORT_CERT_HOSTS" ]; then
-  MSG="$MSG\n[证书]\n"
+  block=""
   for host in $REPORT_CERT_HOSTS; do
     line=$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null || true)
     end=${line#notAfter=}
     end_ts=$(date -d "$end" +%s 2>/dev/null || true)
     if [ -z "$end" ] || [ -z "$end_ts" ]; then
-      MSG="$MSG- $host: 获取失败\n"
+      block="$block- $host：获取失败 ⚠️\n"
+      HAS_WARN=1
     else
       days=$(( (end_ts - NOW) / 86400 ))
-      MSG="$MSG- $host: 剩余 ${days} 天"
-      [ "$days" -le "$CERT_WARN_DAYS" ] && MSG="$MSG ⚠️"
-      MSG="$MSG\n"
+      if [ "$days" -le "$CERT_WARN_DAYS" ]; then
+        block="$block- $host：剩余 ${days} 天 ⚠️\n"
+        HAS_WARN=1
+      fi
     fi
   done
-fi
-
-if [ -n "$REPORT_BACKUP_TARGETS" ]; then
-  MSG="$MSG\n[备份]\n"
-  for item in $REPORT_BACKUP_TARGETS; do
-    path=${item%%|*}
-    rest=${item#*|}
-    max_hours=${rest%%|*}
-    min_size=${rest#*|}
-    if [ ! -e "$path" ]; then
-      MSG="$MSG- $path: 缺失\n"
-      continue
-    fi
-    mtime=$(stat -c %Y "$path" 2>/dev/null || true)
-    size=$(stat -c %s "$path" 2>/dev/null || echo 0)
-    age_hours=$(( (NOW - mtime) / 3600 ))
-    MSG="$MSG- $path: ${age_hours}h, ${size}B"
-    [ "$size" -lt "$min_size" ] && MSG="$MSG ⚠️"
-    [ "$age_hours" -gt "$max_hours" ] && MSG="$MSG ⚠️"
-    MSG="$MSG\n"
-  done
+  [ -n "$block" ] && MSG="$MSG\n[证书提醒]\n$(printf '%b' "$block")"
 fi
 
 if [ -f "$EVENT_LOG" ]; then
-  MSG="$MSG\n[最近异常摘要]\n"
   tail -n "$REPORT_EVENT_LINES" "$EVENT_LOG" | while IFS= read -r line; do
     printf '%s\n' "- $line"
   done > "$DIR/.state/.daily_event_snip.tmp"
   if [ -s "$DIR/.state/.daily_event_snip.tmp" ]; then
-    MSG="$MSG$(cat "$DIR/.state/.daily_event_snip.tmp")\n"
-  else
-    MSG="$MSG- 无\n"
+    MSG="$MSG\n[最近异常摘要]\n$(cat "$DIR/.state/.daily_event_snip.tmp")\n"
   fi
   rm -f "$DIR/.state/.daily_event_snip.tmp"
-else
-  MSG="$MSG\n[最近异常摘要]\n- 暂无记录\n"
 fi
+
+[ "$HAS_WARN" -eq 0 ] && MSG="$MSG\n[状态概览]\n- 当前未发现新的服务/证书异常\n"
 
 notify "NAS 每日报告" "$(printf '%b' "$MSG")"
 exit 0
