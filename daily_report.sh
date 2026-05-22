@@ -50,22 +50,26 @@ if [ -n "$REPORT_TARGETS" ]; then
     human=$(python3 -c '
 import sys
 v = float(sys.argv[1])
-if v >= 1024*1024:
-    print(f"{v/1024/1024:.2f} T")
+if v >= 1024*1024*1024:
+    print(f"{v/1024/1024/1024:.2f} T")
+elif v >= 1024*1024:
+    print(f"{v/1024/1024:.2f} G")
 elif v >= 1024:
-    print(f"{v/1024:.2f} G")
+    print(f"{v/1024:.2f} M")
 else:
-    print(f"{v:.2f} M")
+    print(f"{v:.2f} K")
 ' "$avail")
     human_total=$(python3 -c '
 import sys
 v = float(sys.argv[1])
-if v >= 1024*1024:
-    print(f"{v/1024/1024:.2f} T")
+if v >= 1024*1024*1024:
+    print(f"{v/1024/1024/1024:.2f} T")
+elif v >= 1024*1024:
+    print(f"{v/1024/1024:.2f} G")
 elif v >= 1024:
-    print(f"{v/1024:.2f} G")
+    print(f"{v/1024:.2f} M")
 else:
-    print(f"{v:.2f} M")
+    print(f"{v:.2f} K")
 ' "$total")
     MSG="$MSG- $mount：已用 $used，剩余 $human，总容量 $human_total"
     [ "$used_num" -ge "$REPORT_DISK_WARN" ] && MSG="$MSG ⚠️"
@@ -82,11 +86,13 @@ warn = int(sys.argv[2])
 d = json.load(open(p, encoding="utf-8"))
 def human(kb):
     kb = float(kb)
+    if kb >= 1024 * 1024 * 1024:
+        return f"{kb/1024/1024/1024:.2f} TB"
     if kb >= 1024 * 1024:
-        return f"{kb/1024/1024:.2f} TB"
+        return f"{kb/1024/1024:.2f} GB"
     if kb >= 1024:
-        return f"{kb/1024:.2f} GB"
-    return f"{kb:.2f} MB"
+        return f"{kb/1024:.2f} MB"
+    return f"{kb:.2f} KB"
 for item in d.get("items", []):
     mount = item.get("mount")
     used = int(item.get("used", 0))
