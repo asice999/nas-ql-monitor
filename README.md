@@ -97,3 +97,5 @@ cd /ql/data/repo/asice999_nas-ql-monitor_main && sh install.sh
 `daily_report.sh` 会读取 `.state/alert_events.log`，附带最近异常/恢复摘要。
 - `REPORT_EVENT_LINES`：默认 `10`
 - `REPORT_DISK_WARN`：默认 `85`，仅用于日报中给高使用率磁盘加 `⚠️` 标记，不影响日报每天推送
+- `REPORT_HOST_DOCKER`：默认 `true`，日报正文显示宿主机 Docker 当前状态
+- `REPORT_HOST_DISK`：默认 `true`，日报正文显示宿主机磁盘当前状态

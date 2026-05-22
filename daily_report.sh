@@ -11,6 +11,9 @@ REPORT_DISK_WARN=${REPORT_DISK_WARN:-85}
 REPORT_CERT_HOSTS=${REPORT_CERT_HOSTS:-""}
 REPORT_BACKUP_TARGETS=${REPORT_BACKUP_TARGETS:-""}
 REPORT_EVENT_LINES=${REPORT_EVENT_LINES:-10}
+HOST_STATUS_DIR=${HOST_STATUS_DIR:-/ql/data/monitor-status}
+REPORT_HOST_DOCKER=${REPORT_HOST_DOCKER:-true}
+REPORT_HOST_DISK=${REPORT_HOST_DISK:-true}
 TIMEOUT=${TIMEOUT:-8}
 CERT_WARN_DAYS=${CERT_WARN_DAYS:-30}
 NOW=$(date +%s)
@@ -22,7 +25,7 @@ if [ -n "$REPORT_SERVICES" ]; then
     url=${item%%|*}
     name=${item#*|}
     code=$(curl -k -sS -m "$TIMEOUT" -o /dev/null -w '%{http_code}' "$url" || true)
-    [ "$code" = "200" ] && MSG="$MSG- $name: OK\n" || MSG="$MSG- $name: FAIL($code)\n"
+    [ "$code" = "200" ] && MSG="$MSG- $name：正常\n" || MSG="$MSG- $name：异常($code) ⚠️\n"
   done
 fi
 
@@ -35,7 +38,7 @@ if [ -n "$REPORT_CONTAINERS" ]; then
 fi
 
 if [ -n "$REPORT_TARGETS" ]; then
-  MSG="$MSG\n[磁盘空间]\n"
+  MSG="$MSG\n[容器内磁盘空间]\n"
   for p in $REPORT_TARGETS; do
     line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$6}') || true
     [ -n "$line" ] || continue
@@ -43,10 +46,42 @@ if [ -n "$REPORT_TARGETS" ]; then
     used_num=$(printf '%s' "$used" | tr -d '%')
     avail=$(printf '%s' "$line" | awk '{print $2}')
     mount=$(printf '%s' "$line" | awk '{print $3}')
-    MSG="$MSG- $mount: used $used, free $avail"
+    MSG="$MSG- $mount：已用 $used，剩余 $avail"
     [ "$used_num" -ge "$REPORT_DISK_WARN" ] && MSG="$MSG ⚠️"
     MSG="$MSG\n"
   done
+fi
+
+if [ "$REPORT_HOST_DISK" = "true" ] && [ -f "$HOST_STATUS_DIR/disk_status.json" ]; then
+  MSG="$MSG\n[宿主机磁盘状态]\n"
+  python3 -c '
+import json, sys
+p = sys.argv[1]
+warn = int(sys.argv[2])
+d = json.load(open(p, encoding="utf-8"))
+for item in d.get("items", []):
+    mark = " ⚠️" if int(item.get("used", 0)) >= warn else ""
+    print(f"- {item.get('mount')}：已用 {item.get('used')}%，剩余 {item.get('free')}{mark}")
+' "$HOST_STATUS_DIR/disk_status.json" "$REPORT_DISK_WARN" > "$DIR/.state/.host_disk_daily.tmp"
+  MSG="$MSG$(cat "$DIR/.state/.host_disk_daily.tmp")\n"
+  rm -f "$DIR/.state/.host_disk_daily.tmp"
+fi
+
+if [ "$REPORT_HOST_DOCKER" = "true" ] && [ -f "$HOST_STATUS_DIR/docker_status.json" ]; then
+  MSG="$MSG\n[宿主机 Docker 状态]\n"
+  python3 -c '
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p, encoding="utf-8"))
+for item in d.get("items", []):
+    status = item.get("status")
+    restart = item.get("restart", 0)
+    mark = " ⚠️" if status != "running" else ""
+    cn = "运行中" if status == "running" else status
+    print(f"- {item.get('name')}：{cn}，重启 {restart} 次{mark}")
+' "$HOST_STATUS_DIR/docker_status.json" > "$DIR/.state/.host_docker_daily.tmp"
+  MSG="$MSG$(cat "$DIR/.state/.host_docker_daily.tmp")\n"
+  rm -f "$DIR/.state/.host_docker_daily.tmp"
 fi
 
 if [ -n "$REPORT_CERT_HOSTS" ]; then
