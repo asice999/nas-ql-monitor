@@ -22,24 +22,24 @@ old_ip=""
 printf '%s' "$current_ip" > "$state_file"
 
 FAIL=0
-MSG="当前公网 IP: $current_ip\n"
+MSG="当前公网 IP：$current_ip\n"
 
 if [ -n "$old_ip" ] && [ "$old_ip" != "$current_ip" ]; then
-  MSG="$MSG⚠️ 公网 IP 发生变化：$old_ip -> $current_ip\n"
+  MSG="$MSG⚠️ 公网 IP 发生变化：$old_ip → $current_ip\n"
   FAIL=1
 fi
 
 for domain in $DDNS_DOMAINS; do
   resolved=$(nslookup "$domain" 2>/dev/null | awk '/^Address: /{print $2}' | tail -1)
   if [ -z "$resolved" ]; then
-    MSG="$MSG❌ $domain 解析失败\n"
+    MSG="$MSG❌ $domain：解析失败\n"
     FAIL=1
     continue
   fi
   if [ "$resolved" = "$current_ip" ]; then
-    MSG="$MSG✅ $domain -> $resolved\n"
+    MSG="$MSG✅ $domain：解析正常（$resolved）\n"
   else
-    MSG="$MSG❌ $domain -> $resolved，与当前公网 IP 不一致\n"
+    MSG="$MSG❌ $domain：当前解析 $resolved，与公网 IP 不一致\n"
     FAIL=1
   fi
 done

@@ -12,10 +12,15 @@ for c in $CONTAINERS; do
   status=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)
   restarts=$(docker inspect -f '{{.RestartCount}}' "$c" 2>/dev/null || echo 0)
   if [ "$status" = "running" ]; then
-    MSG="$MSG✅ $c running (restart=$restarts)\n"
+    MSG="$MSG✅ $c：运行中（重启 $restarts 次）\n"
   else
     FAIL=1
-    MSG="$MSG❌ $c $status (restart=$restarts)\n"
+    cn_status=$status
+    [ "$status" = "missing" ] && cn_status="未找到"
+    [ "$status" = "exited" ] && cn_status="已退出"
+    [ "$status" = "restarting" ] && cn_status="重启中"
+    [ "$status" = "paused" ] && cn_status="已暂停"
+    MSG="$MSG❌ $c：$cn_status（重启 $restarts 次）\n"
   fi
 done
 
