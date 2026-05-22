@@ -99,3 +99,4 @@ cd /ql/data/repo/asice999_nas-ql-monitor_main && sh install.sh
 - `REPORT_DISK_WARN`：默认 `85`，仅用于日报中给高使用率磁盘加 `⚠️` 标记，不影响日报每天推送
 - `REPORT_HOST_DOCKER`：默认 `true`，日报正文显示宿主机 Docker 当前状态
 - `REPORT_HOST_DISK`：默认 `true`，日报正文显示宿主机磁盘当前状态
+- 容量显示规则：≥ 1TB 显示为 `xx.xx TB`，≥ 1GB 显示为 `xx.xx GB`，否则显示为 `xx.xx MB`

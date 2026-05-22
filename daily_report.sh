@@ -40,13 +40,34 @@ fi
 if [ -n "$REPORT_TARGETS" ]; then
   MSG="$MSG\n[容器内磁盘空间]\n"
   for p in $REPORT_TARGETS; do
-    line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$6}') || true
+    line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$2" "$6}') || true
     [ -n "$line" ] || continue
     used=$(printf '%s' "$line" | awk '{print $1}')
     used_num=$(printf '%s' "$used" | tr -d '%')
     avail=$(printf '%s' "$line" | awk '{print $2}')
-    mount=$(printf '%s' "$line" | awk '{print $3}')
-    MSG="$MSG- $mount：已用 $used，剩余 $avail"
+    total=$(printf '%s' "$line" | awk '{print $3}')
+    mount=$(printf '%s' "$line" | awk '{print $4}')
+    human=$(python3 -c '
+import sys
+v = float(sys.argv[1])
+if v >= 1024*1024:
+    print(f"{v/1024/1024:.2f} T")
+elif v >= 1024:
+    print(f"{v/1024:.2f} G")
+else:
+    print(f"{v:.2f} M")
+' "$avail")
+    human_total=$(python3 -c '
+import sys
+v = float(sys.argv[1])
+if v >= 1024*1024:
+    print(f"{v/1024/1024:.2f} T")
+elif v >= 1024:
+    print(f"{v/1024:.2f} G")
+else:
+    print(f"{v:.2f} M")
+' "$total")
+    MSG="$MSG- $mount：已用 $used，剩余 $human，总容量 $human_total"
     [ "$used_num" -ge "$REPORT_DISK_WARN" ] && MSG="$MSG ⚠️"
     MSG="$MSG\n"
   done
@@ -59,13 +80,20 @@ import json, sys
 p = sys.argv[1]
 warn = int(sys.argv[2])
 d = json.load(open(p, encoding="utf-8"))
+def human(kb):
+    kb = float(kb)
+    if kb >= 1024 * 1024:
+        return f"{kb/1024/1024:.2f} TB"
+    if kb >= 1024:
+        return f"{kb/1024:.2f} GB"
+    return f"{kb:.2f} MB"
 for item in d.get("items", []):
     mount = item.get("mount")
     used = int(item.get("used", 0))
-    free_kb = int(item.get("free", 0))
-    free_gb = free_kb / 1024 / 1024
+    free_kb = float(item.get("free", 0))
+    total_kb = float(item.get("total", 0))
     mark = " ⚠️" if used >= warn else ""
-    print("- {}：已用 {}%，剩余 {:.1f} GB{}".format(mount, used, free_gb, mark))
+    print("- {}：已用 {}%，剩余 {}，总容量 {}{}".format(mount, used, human(free_kb), human(total_kb), mark))
 ' "$HOST_STATUS_DIR/disk_status.json" "$REPORT_DISK_WARN" > "$DIR/.state/.host_disk_daily.tmp"
   MSG="$MSG$(cat "$DIR/.state/.host_disk_daily.tmp")\n"
   rm -f "$DIR/.state/.host_disk_daily.tmp"
