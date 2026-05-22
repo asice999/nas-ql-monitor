@@ -30,7 +30,13 @@ if ! command -v ql >/dev/null 2>&1; then
   exit 1
 fi
 
+add_or_update '*/10 * * * *' "task $QL_REPO_DIR/ql_check_services.js" 'NAS 服务在线监控'
+add_or_update '*/10 * * * *' "task $QL_REPO_DIR/ql_check_docker.js" 'NAS 容器状态监控'
+add_or_update '0 */6 * * *' "task $QL_REPO_DIR/ql_check_disk.js" 'NAS 磁盘空间监控'
+add_or_update '30 8 * * *' "task $QL_REPO_DIR/ql_check_cert.js" 'NAS 证书到期监控'
+add_or_update '20 3 * * *' "task $QL_REPO_DIR/ql_check_backup.js" 'NAS 备份结果监控'
+add_or_update '0 9 * * *' "task $QL_REPO_DIR/ql_daily_report.js" 'NAS 每日报告'
 add_or_update '*/30 * * * *' "task $QL_REPO_DIR/ql_check_ddns_ip.js" 'NAS DDNS / IP 监控'
 add_or_update '*/15 * * * *' "task $QL_REPO_DIR/ql_check_api_health.js" 'NAS API 健康检查'
 
-echo '安装完成。可在青龙任务列表中查看：NAS DDNS / IP 监控 / NAS API 健康检查'
+echo '安装完成。已创建/重建全部 NAS 监控任务。'
