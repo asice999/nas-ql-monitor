@@ -60,8 +60,11 @@ p = sys.argv[1]
 warn = int(sys.argv[2])
 d = json.load(open(p, encoding="utf-8"))
 for item in d.get("items", []):
-    mark = " ⚠️" if int(item.get("used", 0)) >= warn else ""
-    print(f"- {item.get('mount')}：已用 {item.get('used')}%，剩余 {item.get('free')}{mark}")
+    mount = item.get("mount")
+    used = item.get("used", 0)
+    free = item.get("free")
+    mark = " ⚠️" if int(used) >= warn else ""
+    print("- {}：已用 {}%，剩余 {}{}".format(mount, used, free, mark))
 ' "$HOST_STATUS_DIR/disk_status.json" "$REPORT_DISK_WARN" > "$DIR/.state/.host_disk_daily.tmp"
   MSG="$MSG$(cat "$DIR/.state/.host_disk_daily.tmp")\n"
   rm -f "$DIR/.state/.host_disk_daily.tmp"
@@ -74,11 +77,12 @@ import json, sys
 p = sys.argv[1]
 d = json.load(open(p, encoding="utf-8"))
 for item in d.get("items", []):
+    name = item.get("name")
     status = item.get("status")
     restart = item.get("restart", 0)
     mark = " ⚠️" if status != "running" else ""
-    cn = "运行中" if status == "running" else status
-    print(f"- {item.get('name')}：{cn}，重启 {restart} 次{mark}")
+    cn = "运行中" if status == "running" else str(status)
+    print("- {}：{}，重启 {} 次{}".format(name, cn, restart, mark))
 ' "$HOST_STATUS_DIR/docker_status.json" > "$DIR/.state/.host_docker_daily.tmp"
   MSG="$MSG$(cat "$DIR/.state/.host_docker_daily.tmp")\n"
   rm -f "$DIR/.state/.host_docker_daily.tmp"

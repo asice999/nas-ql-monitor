@@ -35,20 +35,20 @@ ql repo https://github.com/asice999/nas-ql-monitor.git "" "" "" main "js sh"
 ```bash
 MONITOR_STATUS_DIR=/volume1/docker/qinglong/data/monitor-status \
 HOST_CONTAINERS="qinglong postgres-main sub2api moviepilot-v2 jellyfin emby qbittorrent navidrome" \
-sh host_collect_docker.sh
+sh /volume1/docker/qinglong/data/repo/asice999_nas-ql-monitor_main/host_collect_docker.sh
 ```
 
 ```bash
 MONITOR_STATUS_DIR=/volume1/docker/qinglong/data/monitor-status \
 HOST_TARGETS="/ /volume1" \
 HOST_THRESHOLD=85 \
-sh host_collect_disk.sh
+sh /volume1/docker/qinglong/data/repo/asice999_nas-ql-monitor_main/host_collect_disk.sh
 ```
 
 ```bash
 MONITOR_STATUS_DIR=/volume1/docker/qinglong/data/monitor-status \
 HOST_BACKUP_TARGETS="/volume1/backup/db.sql.gz|30|1024 /volume1/backup/config.tar.gz|30|1024" \
-sh host_collect_backup.sh
+sh /volume1/docker/qinglong/data/repo/asice999_nas-ql-monitor_main/host_collect_backup.sh
 ```
 
 ## 青龙读取任务
