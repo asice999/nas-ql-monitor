@@ -6,15 +6,10 @@ HOST_CONTAINERS=${HOST_CONTAINERS:-"qinglong postgres-main sub2api moviepilot-v2
 mkdir -p "$MONITOR_STATUS_DIR"
 out="$MONITOR_STATUS_DIR/docker_status.json"
 
-json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
-}
-
+tmp=$(mktemp)
 now=$(date '+%Y-%m-%d %H:%M:%S')
 ok=true
 summary=""
-items=""
-first=1
 
 for c in $HOST_CONTAINERS; do
   status=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)
@@ -22,16 +17,24 @@ for c in $HOST_CONTAINERS; do
   [ "$status" = "running" ] || ok=false
   line="$c:$status(restart=$restart)"
   [ -z "$summary" ] && summary="$line" || summary="$summary; $line"
-  esc_name=$(json_escape "$c")
-  esc_status=$(json_escape "$status")
-  if [ "$first" -eq 1 ]; then
-    items="{\"name\":\"$esc_name\",\"status\":\"$esc_status\",\"restart\":$restart}"
-    first=0
-  else
-    items="$items,{\"name\":\"$esc_name\",\"status\":\"$esc_status\",\"restart\":$restart}"
-  fi
+  printf '%s\t%s\t%s\n' "$c" "$status" "$restart" >> "$tmp"
 done
 
-esc_summary=$(json_escape "$summary")
-printf '{"kind":"docker","ok":%s,"time":"%s","summary":"%s","items":[%s]}\n' "$ok" "$now" "$esc_summary" "$items" > "$out"
+python3 - "$tmp" "$out" "$now" "$ok" "$summary" <<'PY'
+import json, sys
+src, out, now, ok_str, summary = sys.argv[1:6]
+ok = ok_str.lower() == 'true'
+items = []
+with open(src, 'r', encoding='utf-8') as f:
+    for line in f:
+        line = line.rstrip('\n')
+        if not line:
+            continue
+        name, status, restart = line.split('\t')
+        items.append({"name": name, "status": status, "restart": int(restart)})
+obj = {"kind": "docker", "ok": ok, "time": now, "summary": summary, "items": items}
+with open(out, 'w', encoding='utf-8') as f:
+    json.dump(obj, f, ensure_ascii=False)
+PY
+rm -f "$tmp"
 echo "wrote $out"

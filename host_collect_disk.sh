@@ -7,15 +7,10 @@ HOST_THRESHOLD=${HOST_THRESHOLD:-85}
 mkdir -p "$MONITOR_STATUS_DIR"
 out="$MONITOR_STATUS_DIR/disk_status.json"
 
-json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
-}
-
+tmp=$(mktemp)
 now=$(date '+%Y-%m-%d %H:%M:%S')
 ok=true
 summary=""
-items=""
-first=1
 
 for p in $HOST_TARGETS; do
   line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$2" "$6}') || true
@@ -27,15 +22,24 @@ for p in $HOST_TARGETS; do
   [ "$used" -lt "$HOST_THRESHOLD" ] || ok=false
   one="$mount:${used}%"
   [ -z "$summary" ] && summary="$one" || summary="$summary; $one"
-  esc_mount=$(json_escape "$mount")
-  if [ "$first" -eq 1 ]; then
-    items="{\"mount\":\"$esc_mount\",\"used\":$used,\"free\":\"$free\",\"total\":\"$total\"}"
-    first=0
-  else
-    items="$items,{\"mount\":\"$esc_mount\",\"used\":$used,\"free\":\"$free\",\"total\":\"$total\"}"
-  fi
+  printf '%s\t%s\t%s\t%s\n' "$mount" "$used" "$free" "$total" >> "$tmp"
 done
 
-esc_summary=$(json_escape "$summary")
-printf '{"kind":"disk","ok":%s,"time":"%s","summary":"%s","items":[%s]}\n' "$ok" "$now" "$esc_summary" "$items" > "$out"
+python3 - "$tmp" "$out" "$now" "$ok" "$summary" <<'PY'
+import json, sys
+src, out, now, ok_str, summary = sys.argv[1:6]
+ok = ok_str.lower() == 'true'
+items = []
+with open(src, 'r', encoding='utf-8') as f:
+    for line in f:
+        line = line.rstrip('\n')
+        if not line:
+            continue
+        mount, used, free, total = line.split('\t')
+        items.append({"mount": mount, "used": int(used), "free": free, "total": total})
+obj = {"kind": "disk", "ok": ok, "time": now, "summary": summary, "items": items}
+with open(out, 'w', encoding='utf-8') as f:
+    json.dump(obj, f, ensure_ascii=False)
+PY
+rm -f "$tmp"
 echo "wrote $out"
