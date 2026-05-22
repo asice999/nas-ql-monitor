@@ -25,7 +25,13 @@ if [ -n "$REPORT_SERVICES" ]; then
     url=${item%%|*}
     name=${item#*|}
     code=$(curl -k -sS -m "$TIMEOUT" -o /dev/null -w '%{http_code}' "$url" || true)
-    [ "$code" = "200" ] && MSG="$MSG- $name：正常\n" || MSG="$MSG- $name：异常($code) ⚠️\n"
+    if [ "$code" = "200" ]; then
+      MSG="$MSG- $name：正常\n"
+    elif [ "$code" = "301" ] || [ "$code" = "302" ]; then
+      MSG="$MSG- $name：跳转($code) ⚠️\n"
+    else
+      MSG="$MSG- $name：异常($code) ⚠️\n"
+    fi
   done
 fi
 
@@ -38,7 +44,8 @@ if [ -n "$REPORT_CONTAINERS" ]; then
 fi
 
 if [ -n "$REPORT_TARGETS" ]; then
-  MSG="$MSG\n[容器内磁盘空间]\n"
+  container_disk_tmp="$DIR/.state/.container_disk_daily.tmp"
+  : > "$container_disk_tmp"
   for p in $REPORT_TARGETS; do
     line=$(df -P "$p" 2>/dev/null | awk 'NR==2{print $5" "$4" "$2" "$6}') || true
     [ -n "$line" ] || continue
@@ -71,10 +78,14 @@ elif v >= 1024:
 else:
     print(f"{v:.2f} K")
 ' "$total")
-    MSG="$MSG- $mount：已用 $used，剩余 $human，总容量 $human_total"
-    [ "$used_num" -ge "$REPORT_DISK_WARN" ] && MSG="$MSG ⚠️"
-    MSG="$MSG\n"
+    line_text="- $mount：已用 $used，剩余 $human，总容量 $human_total"
+    [ "$used_num" -ge "$REPORT_DISK_WARN" ] && line_text="$line_text ⚠️"
+    printf '%s\n' "$line_text" >> "$container_disk_tmp"
   done
+  if [ -s "$container_disk_tmp" ]; then
+    MSG="$MSG\n[容器内磁盘空间]\n$(cat "$container_disk_tmp")\n"
+  fi
+  rm -f "$container_disk_tmp"
 fi
 
 if [ "$REPORT_HOST_DISK" = "true" ] && [ -f "$HOST_STATUS_DIR/disk_status.json" ]; then
